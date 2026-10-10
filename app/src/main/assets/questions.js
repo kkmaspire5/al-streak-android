@@ -1,0 +1,27 @@
+// Add more questions here: [subject (A=Accounting, E=Economics, I=ICT), chapter, question, CORRECT answer, wrong 1, wrong 2, wrong 3, explanation]
+const BANK = [
+['A','Double entry','Goods purchased on credit from Perera. Which entry is correct?','Dr Purchases, Cr Perera (creditor)','Dr Perera, Cr Purchases','Dr Purchases, Cr Cash','Dr Cash, Cr Purchases','Goods in = debit Purchases. Owing the supplier creates a liability, so credit the creditor.'],
+['A','Double entry','The owner introduces Rs 200,000 cash into the business. Which entry is correct?','Dr Cash, Cr Capital','Dr Capital, Cr Cash','Dr Cash, Cr Drawings','Dr Drawings, Cr Cash','Cash (an asset) increases, so debit it. The owner\'s capital increases, so credit it.'],
+['A','Final accounts','Gross profit equals:','Sales − Cost of sales','Sales − All expenses','Net profit + Drawings','Sales − Purchases only','Gross profit uses cost of sales (opening stock + purchases − closing stock), not purchases alone.'],
+['A','Final accounts','Opening stock Rs 20,000, purchases Rs 150,000, closing stock Rs 30,000. What is the cost of sales?','Rs 140,000','Rs 160,000','Rs 150,000','Rs 200,000','Cost of sales = 20,000 + 150,000 − 30,000 = 140,000.'],
+['A','Bank reconciliation','An unpresented cheque makes the bank statement balance:','Higher than the cash book','Lower than the cash book','Equal to it','Unaffected','The cash book already deducted the cheque; the bank has not yet, so the statement shows more.'],
+['A','Bank reconciliation','Bank charges on the statement are not yet in the cash book. The cash book needs to be:','Credited with the charges','Debited with the charges','Left unchanged','Debited with double the charges','Charges reduce the money in the bank, so credit the cash book.'],
+['A','Depreciation','Cost Rs 100,000, residual Rs 10,000, life 5 years. Straight-line annual charge?','Rs 18,000','Rs 20,000','Rs 22,000','Rs 16,000','(100,000 − 10,000) ÷ 5 = 18,000.'],
+['A','Depreciation','Which method charges the same depreciation every year?','Straight-line','Reducing balance','Revaluation','Sum of the years','Straight-line spreads cost minus residual value evenly over the useful life.'],
+['E','Demand & supply','A rise in the price of a substitute will:','Increase demand for the good','Decrease demand for the good','Shift the supply curve','Have no effect','Buyers switch toward the now-cheaper good, shifting its demand right.'],
+['E','Demand & supply','Supply shifts right while demand is unchanged. Equilibrium will show:','Lower price, higher quantity','Higher price, higher quantity','Higher price, lower quantity','Lower price, lower quantity','More supply at every price pushes the price down and the quantity traded up.'],
+['E','Elasticity','Price rises 10% and quantity demanded falls 20%. PED is:','−2 (elastic)','−0.5 (inelastic)','−1 (unitary)','−10','PED = %ΔQ ÷ %ΔP = −20 ÷ 10 = −2, so demand is elastic.'],
+['E','Elasticity','Demand is inelastic and the firm raises its price. Total revenue will:','Rise','Fall','Stay the same','Fall to zero','Quantity falls by a smaller percentage than price rises, so revenue goes up.'],
+['E','National income','GDP at market prices measures:','Value of final goods and services produced within a country in a year','Value of all transactions','Only exports','Government spending only','GDP counts final output only, to avoid double counting.'],
+['E','National income','Which item is a transfer payment, so it is not counted in GDP?','Government welfare payments','Wages of teachers','Purchase of new machinery','Exports of tea','Transfer payments move money around without any new production in return.'],
+['E','Market structures','A feature of perfect competition:','Many sellers, homogeneous product','A single seller','Few large sellers','Branded, differentiated goods','Firms are price takers selling identical products.'],
+['E','Market structures','A profit-maximising monopolist produces where:','MR = MC','P = AC','MR = AR','Total revenue is highest','Profit is greatest at the output where marginal revenue equals marginal cost.'],
+['I','Number systems','Binary 1011 in decimal is:','11','13','9','10','8 + 0 + 2 + 1 = 11.'],
+['I','Number systems','Decimal 13 in binary is:','1101','1011','1110','1001','13 = 8 + 4 + 1, so 1101.'],
+['I','Logic gates','AND gate output when inputs are 1 and 0:','0','1','Undefined','10','AND outputs 1 only when both inputs are 1.'],
+['I','Logic gates','OR gate output when both inputs are 0:','0','1','Undefined','10','OR outputs 1 if at least one input is 1. Here neither is.'],
+['I','Networking','Which device forwards packets between different networks?','Router','Hub','Repeater','Network cable','Routers connect separate networks and choose paths for packets.'],
+['I','Networking','Which topology connects every device to a central switch?','Star','Bus','Ring','Mesh','In a star topology each device has its own link to the central switch or hub.'],
+['I','Databases','A primary key must be:','Unique and not null','Repeated across rows','Text only','Optional','It identifies each record uniquely, so it cannot repeat or be empty.'],
+['I','Databases','A foreign key is used to:','Link a table to the primary key of another table','Uniquely identify rows in its own table','Encrypt the data','Sort the records','It holds a value that matches a primary key elsewhere, creating a relationship.']
+];
