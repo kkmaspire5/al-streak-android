@@ -16,7 +16,7 @@ When the build shows a green tick, open the repo's Releases page (right-hand sid
 Open the downloaded APK. Android will ask you to allow installing from this source (once). Then tap Install. The icon appears on the home screen.
 
 ## Updating the app or questions
-Edit `app/src/main/assets/questions.js` (add questions) or `index.html` right on GitHub (pencil icon), then Commit. A new build runs and replaces the file under Releases. Friends install it over the old one and keep their progress.
+Edit `app/src/main/assets/questions.js` (add questions; see CONTENT-GUIDE.md), `app.js` or `style.css` right on GitHub (pencil icon), then Commit. A new build runs and replaces the file under Releases. Friends install it over the old one and keep their progress.
 
 ## If the build shows a red cross
 Open the failed run, click the red step, and copy the last 30 lines of the log to Claude.
@@ -24,3 +24,6 @@ Open the failed run, click the red step, and copy the last 30 lines of the log t
 ## Notes
 - Accounts and progress live on each phone. Uninstalling the app erases them.
 - Google is changing sideloading rules (developer verification). If installs get blocked later, check the Android Developer Console for the free limited-distribution account.
+
+## Your logo
+Replace `app/src/main/assets/logo.png` (square PNG, 512x512 or bigger) on GitHub. The build makes the phone icons from it automatically and the sign-in screen shows it too.

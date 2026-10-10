@@ -26,10 +26,12 @@ class MainActivity : Activity() {
             .build()
 
         web = WebView(this)
+        web.setBackgroundColor(Color.parseColor("#F1EEFF"))
         setContentView(web)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
         web.settings.allowFileAccess = false
+        web.settings.textZoom = 100   // keep the layout the same even with a large system font
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -39,8 +41,12 @@ class MainActivity : Activity() {
         web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
+    // The app handles Back itself (close a lesson, go to Home...). It only
+    // exits when the page says there is nothing left to go back to.
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (web.canGoBack()) web.goBack() else super.onBackPressed()
+        web.evaluateJavascript("(function(){return window.onBack?window.onBack():false})()") { handled ->
+            if (handled != "true") finish()
+        }
     }
 }
