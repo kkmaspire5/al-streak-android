@@ -23,3 +23,25 @@ Give Claude the file (PDF, photo of a page, Word, PowerPoint; Sinhala, Tamil or 
 3. Ask your teacher to scan the new questions, then upload the file to GitHub. The app rebuilds.
 
 Past papers are government exam material. Fine for your own and your friends' practice. Check before putting the app on the Play Store.
+
+## Where the questions go
+- **Small, hand-written sets**: edit `app/src/main/assets/questions.js` (needs a new app build).
+- **Big sets from past papers and tutes**: Claude writes them into `content/packs.json`. Commit it and every phone picks it up on the next start or when the student taps Sync. No new build needed.
+
+`packs.json` looks like this:
+
+```json
+{
+  "version": 2,
+  "chapters": [
+    { "s": "A", "title": "Depreciation", "icon": "trending-down",
+      "notes": [ { "h": "Heading", "b": "Short text", "k": "Key formula" } ],
+      "qs": [ { "t": "mcq", "q": "…", "a": "right", "w": ["x","y","z"], "e": "why", "src": "A/L 2019 P1 Q5" } ] }
+  ],
+  "written": [ { "s": "A", "q": "…", "marks": 2, "pts": ["point 1", "point 2"] } ]
+}
+```
+Question types: `mcq`, `tf` (`"a": true`), `fill` (`"a": ["answer"]`), `match` (`"pairs": [["l","r"],...]`), `order` (`"items": [...]`). A chapter with the same subject and title as a built-in one adds to it. Badly formed questions are skipped by the app instead of breaking it.
+
+## Size
+Text is tiny: a whole past paper is roughly 20 KB, so even hundreds of papers fit easily. The PDFs themselves never go into the app or GitHub; only the extracted questions do. Keep diagrams as small compressed images.

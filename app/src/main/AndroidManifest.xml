@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Only used for the small buzz on answers. Not an internet permission. -->
+    <!-- Internet is only used to look for updates and new questions. Lessons work offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets Android open the installer for a downloaded update. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- The small buzz on answers. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:allowBackup="true"

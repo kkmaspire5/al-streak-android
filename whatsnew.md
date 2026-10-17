@@ -1,0 +1,5 @@
+- New look: proper icons instead of emoji, glass-style cards and a sliding navigation bar
+- Smoother animations and page transitions, plus confetti when you get answers right
+- Swipe through note cards
+- In-app update notice with What's new, Update and Skip buttons
+- New questions can now be added without reinstalling the app (Profile > Question packs > Sync)

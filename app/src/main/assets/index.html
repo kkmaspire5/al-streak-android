@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- soft blurred colour blobs that sit behind the glass cards -->
+<div class="orbs" aria-hidden="true"><i></i><i></i><i></i></div>
 <!-- shared gradient for the owl mascot -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <radialGradient id="owlg" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#9D8FFA"/><stop offset=".6" stop-color="#5B4FD8"/><stop offset="1" stop-color="#3D33A8"/></radialGradient>
@@ -15,7 +17,10 @@
 <div id="app"></div>
 <nav id="nav"></nav>
 <div id="toast"></div>
+<div id="modal"></div>
+<script src="config.js"></script>
 <script src="questions.js"></script>
+<script src="icons.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

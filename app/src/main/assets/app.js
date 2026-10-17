@@ -1,24 +1,56 @@
-/* A/L Streak: app logic. Content lives in questions.js. */
+/* A/L Streak: app logic. Content lives in questions.js (+ optional downloaded packs). */
 const $ = s => document.querySelector(s);
 const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const CFG = (typeof CONFIG !== 'undefined') ? CONFIG : { repo: '', build: 0 };   // config.js is written by the build
 const SJ = SUBJECTS, SK = Object.keys(SJ);
-const AV = ['🦊', '🐼', '🐙', '🦉', '🐝', '🦒', '🦄', '🤖'], DN = 'SMTWTFS';
+const DN = 'SMTWTFS';
 const VERSION = 4;                       // bumps when saved data needs migrating
 const TYPE_ORDER = { mcq: 0, tf: 1, fill: 2, match: 3, order: 4 };
 
-/* ---------- content prep ---------- */
-const CH = CHAPTERS.map(c => ({ ...c, key: c.s + '|' + c.title }));
-const Q = [];
-CH.forEach(c => c.qs.forEach(q => Q.push({ ...q, s: c.s, c: c.title, key: c.key, id: q.q })));
+/* ---------- avatars (icons on coloured discs) ---------- */
+const AVS = ['cat', 'dog', 'rabbit', 'bird', 'panda', 'turtle', 'bot', 'rocket'];
+const AVC = { cat: '#FFB8EE', dog: '#FFC9A3', rabbit: '#D3CBFF', bird: '#A9C0FF', panda: '#A9EBCB', turtle: '#CDEFA6', bot: '#FFE680', rocket: '#FFB0B0' };
+const OLD_AV = ['🦊', '🐼', '🐙', '🦉', '🐝', '🦒', '🦄', '🤖'];   // emoji avatars from older versions
+const avId = a => AVS.includes(a) ? a : (OLD_AV.indexOf(a) >= 0 ? AVS[OLD_AV.indexOf(a)] : AVS[0]);
+const avi = (a, sz, extra, tag, attrs) => `<${tag || 'span'} class="av ${extra || ''}" ${attrs || ''} style="width:${sz}px;height:${sz}px;background:${AVC[avId(a)]}">${ic(avId(a), Math.round(sz * .54))}</${tag || 'span'}>`;
+
+/* ---------- content (built-in + downloaded packs) ---------- */
+let CH = [], Q = [], WR = [];
+function validQ(q) {
+  if (!q || typeof q.q !== 'string' || !q.q.trim()) return false;
+  const S = x => typeof x === 'string' && x.trim() !== '';
+  switch (q.t) {
+    case 'mcq': return S(q.a) && Array.isArray(q.w) && q.w.length >= 2 && q.w.length <= 3 && q.w.every(S);
+    case 'tf': return typeof q.a === 'boolean';
+    case 'fill': return Array.isArray(q.a) && q.a.length > 0 && q.a.every(S);
+    case 'match': return Array.isArray(q.pairs) && q.pairs.length >= 3 && q.pairs.length <= 5 && q.pairs.every(p => Array.isArray(p) && S(p[0]) && S(p[1]));
+    case 'order': return Array.isArray(q.items) && q.items.length >= 2 && q.items.length <= 6 && q.items.every(S);
+  }
+  return false;
+}
+function buildContent() {
+  const packs = ld('al3:packs') || {}, map = new Map(), out = [];
+  const add = (c, remote) => {
+    if (!c || !SJ[c.s] || typeof c.title !== 'string' || !c.title) return;
+    const key = c.s + '|' + c.title; let t = map.get(key);
+    if (!t) { t = { s: c.s, title: c.title, icon: c.icon || 'book-open', notes: [], qs: [], key, remote }; map.set(key, t); out.push(t) }
+    if (Array.isArray(c.notes) && c.notes.length && (remote || !t.notes.length)) t.notes = c.notes.filter(n => n && n.h && n.b);
+    (Array.isArray(c.qs) ? c.qs : []).forEach(q => { if (validQ(q) && !t.qs.some(x => x.q === q.q)) t.qs.push(q) });
+  };
+  CHAPTERS.forEach(c => add(c, false));
+  (Array.isArray(packs.chapters) ? packs.chapters : []).forEach(c => add(c, true));
+  CH = out.filter(c => c.qs.length > 0);
+  Q = []; CH.forEach(c => c.qs.forEach(q => Q.push({ ...q, s: c.s, c: c.title, key: c.key, id: q.q })));
+  WR = [...WRITTEN, ...(Array.isArray(packs.written) ? packs.written : [])].filter(w => w && SJ[w.s] && w.q && Array.isArray(w.pts) && w.pts.length && w.marks > 0);
+}
 
 /* ---------- storage + helpers ---------- */
 const ld = k => { try { return JSON.parse(localStorage.getItem(k)) } catch (e) { return null } };
-const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) { } };
+const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true } catch (e) { return false } };
 const dt = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const today = () => dt(new Date()), yest = () => dt(new Date(Date.now() - 864e5));
 const wkOf = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dt(d) };
 const shuf = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[b[i], b[j]] = [b[j], b[i]] } return b };
-const pick1 = a => a[Math.floor(Math.random() * a.length)];
 const hash = async (p, s) => {
   const t = s + p;
   if (window.crypto && crypto.subtle) return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map(x => x.toString(16).padStart(2, '0')).join('');
@@ -30,7 +62,7 @@ const hash = async (p, s) => {
 
 /* ---------- state ---------- */
 let U = null, P = null, scr = 'auth', tab = 'home', mode = 'in', err = '', step = 0;
-let L = null, R = null, N = null, lsub = 'A', migrated = false, backArm = 0;
+let L = null, R = null, N = null, lsub = 'A', migrated = false, backArm = 0, lastKey = '', LAST = { upd: null }, checkedUpd = false;
 let SET = Object.assign({ sfx: true, hap: true }, ld('al3:set') || {});
 
 const newP = () => ({ xp: 0, streak: 0, best: 0, last: '', day: '', dxp: 0, dl: 0, dcb: 0, wk: '', wxp: 0, bad: [], days: {}, mins: {}, chest: '', cd: {}, lessons: 0, maxcb: 0, perf: 0, fixed: 0, papers: 0, wrote: 0, lastCh: '' });
@@ -40,7 +72,7 @@ const lvl = () => Math.floor(P.xp / 300) + 1;
 const subs = () => SK.filter(k => U.subs.includes(k));
 const goal = () => U.goal || 60;
 
-/* ---------- sound + haptics ---------- */
+/* ---------- sound + haptics + particles ---------- */
 let AC = null;
 const TONES = {
   tap: [[520, .04]], ok: [[660, .09], [880, .14]], no: [[200, .16], [150, .22]],
@@ -62,9 +94,18 @@ function snd(n) {
 }
 const buzz = p => { if (SET.hap && navigator.vibrate) { try { navigator.vibrate(p) } catch (e) { } } };
 function setOpt(k) { SET[k] = !SET[k]; sv('al3:set', SET); if (SET[k]) { k === 'sfx' ? snd('ok') : buzz(40) } draw() }
+function burst(x, y, n, cols) {
+  cols = cols || ['#FFE680', '#FFB8EE', '#A9C0FF', '#A9EBCB', '#D3CBFF']; const f = document.createDocumentFragment();
+  for (let i = 0; i < (n || 16); i++) {
+    const e = document.createElement('i'), a = Math.random() * 6.283, d = 50 + Math.random() * 80;
+    e.className = 'bp'; e.style.cssText = `left:${x}px;top:${y}px;background:${cols[i % cols.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 34}px`;
+    f.appendChild(e); setTimeout(() => e.remove(), 950);
+  }
+  document.body.appendChild(f);
+}
 
 /* ---------- small UI pieces ---------- */
-function toast(t) { const e = $('#toast'); e.innerHTML = `<div class="t">${esc(t)}</div>`; clearTimeout(toast.h); toast.h = setTimeout(() => e.innerHTML = '', 2400) }
+function toast(t) { const e = $('#toast'); e.innerHTML = `<div class="t">${esc(t)}</div>`; clearTimeout(toast.h); toast.h = setTimeout(() => e.innerHTML = '', 2600) }
 function addXp(g) { P.xp += g; P.dxp += g; P.wxp += g }
 function touch() {
   const first = P.last !== today();
@@ -72,24 +113,25 @@ function touch() {
   P.best = Math.max(P.best || 0, P.streak); P.days[today()] = 1; return first;
 }
 function owl(m, z) {
-  const ch = m === 'cheer', sd = m === 'sad';
+  const ch = m === 'cheer', sd = m === 'sad', sp = 'M8 0l1.6 4.4L14 6l-4.4 1.6L8 12 6.4 7.6 2 6l4.4-1.6z';
   return `<svg class="owl ${ch ? 'cheer' : ''}" width="${z}" height="${z * 1.1}" viewBox="0 0 100 110" aria-hidden="true"><ellipse cx="50" cy="106" rx="26" ry="3" fill="#0002"/>
 <ellipse cx="40" cy="101" rx="8" ry="3.5" fill="#FF9B3D"/><ellipse cx="60" cy="101" rx="8" ry="3.5" fill="#FF9B3D"/>
 <ellipse class="wl" cx="18" cy="64" rx="8" ry="17" fill="#4A3FC4" transform="rotate(12 18 48)"/><ellipse class="wr" cx="82" cy="64" rx="8" ry="17" fill="#4A3FC4" transform="rotate(-12 82 48)"/>
 <ellipse cx="50" cy="60" rx="31" ry="40" fill="url(#owlg)"/><ellipse cx="50" cy="78" rx="19" ry="20" fill="#EDEAFF"/><circle cx="37" cy="43" r="13" fill="#F4F1FF"/><circle cx="63" cy="43" r="13" fill="#F4F1FF"/>
 ${ch ? '<path d="M31 43q6-8 12 0M57 43q6-8 12 0" stroke="#151515" stroke-width="3" fill="none" stroke-linecap="round"/>' : '<g class="eye"><circle cx="37" cy="43" r="7.5" fill="#fff"/><circle cx="37" cy="43" r="4.6" fill="#151515"/><circle cx="35.5" cy="41.5" r="1.6" fill="#fff"/><circle cx="63" cy="43" r="7.5" fill="#fff"/><circle cx="63" cy="43" r="4.6" fill="#151515"/><circle cx="61.5" cy="41.5" r="1.6" fill="#fff"/></g>'}
 ${sd ? '<path d="M26 34l14-4M60 30l14 4" stroke="#151515" stroke-width="2.4" stroke-linecap="round"/>' : ''}
-<path d="M46 50h8l-4 8z" fill="#FF9B3D"/><path d="M32 30v6q18 9 36 0v-6z" fill="#2A3566"/><path d="M15 25l35-14 35 14-35 11z" fill="#151515"/><path d="M50 24l30 4v8" stroke="#FFC857" stroke-width="1.6" fill="none"/><circle cx="80" cy="38" r="2.4" fill="#FFC857"/>${ch ? '<text x="0" y="18" font-size="13">✨</text><text x="84" y="14" font-size="12">⭐</text>' : ''}</svg>`;
+<path d="M46 50h8l-4 8z" fill="#FF9B3D"/><path d="M32 30v6q18 9 36 0v-6z" fill="#2A3566"/><path d="M15 25l35-14 35 14-35 11z" fill="#151515"/><path d="M50 24l30 4v8" stroke="#FFC857" stroke-width="1.6" fill="none"/><circle cx="80" cy="38" r="2.4" fill="#FFC857"/>${ch ? `<g class="spk"><path transform="translate(-2 2) scale(.9)" d="${sp}" fill="#FFC857"/><path transform="translate(82 -2) scale(.7)" d="${sp}" fill="#FFB8EE"/></g>` : ''}</svg>`;
 }
 function ring(p, sz, w, col) {
   const r = (sz - w) / 2, c = 2 * Math.PI * r, m = sz / 2;
-  return `<svg class="ring" width="${sz}" height="${sz}" aria-hidden="true"><circle cx="${m}" cy="${m}" r="${r}" stroke="#0001" stroke-width="${w}" fill="none"/><circle cx="${m}" cy="${m}" r="${r}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.min(1, p))}" transform="rotate(-90 ${m} ${m})"/></svg>`;
+  return `<svg class="ring" width="${sz}" height="${sz}" aria-hidden="true"><circle cx="${m}" cy="${m}" r="${r}" stroke="#0001" stroke-width="${w}" fill="none"/><circle cx="${m}" cy="${m}" r="${r}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.min(1, p))}" style="--c:${c}" transform="rotate(-90 ${m} ${m})"/></svg>`;
 }
 const hm = m => [String(Math.floor(m / 60)).padStart(2, '0'), String(m % 60).padStart(2, '0')];
 function wk7() { return [...Array(7)].map((_, i) => { const d = new Date(Date.now() - (6 - i) * 864e5), k = dt(d); return { k, l: DN[d.getDay()], m: P.mins[k] || 0 } }) }
 const chDone = c => Math.min(3, P.cd[c.key] || 0);
 const subDone = s => CH.filter(c => c.s === s && chDone(c) >= 3).length;
 const subTotal = s => CH.filter(c => c.s === s).length;
+const sicon = (k, s) => ic(SJ[k].icon, s || 18);
 
 /* ---------- auth + onboarding ---------- */
 function login(u) {
@@ -97,8 +139,9 @@ function login(u) {
   U = d.U; P = Object.assign(newP(), d.P); roll();
   if ((U.v || 1) < VERSION) {            // Business Studies and ICT became two subjects
     if (!U.subs.includes('B')) U.subs.push('B');
-    U.goal = U.goal || 60; U.v = VERSION; migrated = true; persist();
+    U.goal = U.goal || 60; U.v = VERSION; migrated = true;
   }
+  U.av = avId(U.av); persist();
   sv('al3:cur', u); scr = U.name ? 'app' : 'onb'; tab = 'home'; lsub = subs()[0] || 'A'; return true;
 }
 async function submit() {
@@ -112,11 +155,11 @@ async function submit() {
       else {
         const s = Math.random().toString(36).slice(2);
         us[u] = { s, h: await hash(p, s) }; sv('al3:users', us);
-        U = { u, name: '', av: AV[0], stream: 'Commerce', subs: [...SK], goal: 60, v: VERSION }; P = newP(); roll(); persist(); sv('al3:cur', u); scr = 'onb'; step = 0;
+        U = { u, name: '', av: AVS[0], stream: 'Commerce', subs: [...SK], goal: 60, v: VERSION }; P = newP(); roll(); persist(); sv('al3:cur', u); scr = 'onb'; step = 0;
       }
     } else { const r = us[u]; if (!r || r.h !== await hash(p, r.s)) err = 'Wrong username or password'; else login(u) }
   }
-  draw();
+  draw(); startupChecks();
 }
 function logout() { sv('al3:cur', null); U = P = null; scr = 'auth'; mode = 'in'; draw() }
 function authV() {
@@ -138,18 +181,18 @@ function tgs(k) {
 function onbV() {
   if (step === 0) return `<div class="q"><div class="c">${owl('cheer', 110)}</div><h1>Who are you?</h1><p class="mu">Friends will see this on the leaderboard.</p>
 <div class="fld"><label>Display name</label><input id="nm" maxlength="16" value="${esc(U.name)}"></div>
-<div class="row wr" style="margin:14px 0">${AV.map(a => `<button class="av ${U.av === a ? 'on' : ''}" onclick="U.av='${a}';keep();draw()">${a}</button>`).join('')}</div>
+<div class="row wr" style="margin:14px 0">${AVS.map(a => avi(a, 52, U.av === a ? 'on' : '', 'button', `onclick="U.av='${a}';keep();snd('tap');draw()" aria-label="${a}"`)).join('')}</div>
 <button class="pill" onclick="keep();if(!U.name)return toast('Enter a name');step=1;draw()">Continue</button></div>`;
   if (step === 1) return `<div class="q"><h1>Your stream</h1><div class="row wr"><button class="chip on">Commerce</button><button class="chip" disabled>Maths · soon</button><button class="chip" disabled>Bio · soon</button><button class="chip" disabled>Arts · soon</button></div>
 <h2>Subjects</h2><p class="mu" style="margin:0 0 10px">Pick the ones you study. You can change this later.</p>
-<div class="row wr">${SK.map(k => `<button class="chip ${U.subs.includes(k) ? 'on' : ''}" onclick="tgs('${k}')">${SJ[k].icon} ${SJ[k].name}</button>`).join('')}</div>
+<div class="row wr">${SK.map(k => `<button class="chip ${U.subs.includes(k) ? 'on' : ''}" onclick="tgs('${k}')">${sicon(k)} ${SJ[k].name}</button>`).join('')}</div>
 <button class="pill" style="margin-top:28px" onclick="if(!subs().length)return toast('Pick a subject');step=2;draw()">Continue</button></div>`;
   return `<div class="q"><div class="c">${owl('happy', 100)}</div><h1>Daily goal</h1><p class="mu">How much XP do you want to earn each day? One lesson is about 50 XP.</p>
-${goalPick()}<button class="pill" style="margin-top:24px" onclick="lsub=subs()[0];persist();scr='app';draw()">Let's go</button></div>`;
+${goalPick()}<button class="pill" style="margin-top:24px" onclick="lsub=subs()[0];persist();scr='app';draw();startupChecks()">Let's go</button></div>`;
 }
 function goalPick() {
   return [[30, 'Casual', 'about 1 lesson'], [60, 'Regular', 'about 2 lessons'], [100, 'Serious', 'about 3 lessons']].map(g =>
-    `<div class="card go row" style="margin:8px 0;${goal() === g[0] ? 'outline:3px solid var(--blk)' : ''}" onclick="U.goal=${g[0]};persist();snd('tap');draw()"><b style="font-size:22px;width:56px">${g[0]}</b><div class="fl1"><b>${g[1]}</b><div class="mu">${g[2]} a day</div></div>${goal() === g[0] ? '✓' : ''}</div>`).join('');
+    `<div class="card go row" style="margin:8px 0;${goal() === g[0] ? 'outline:3px solid var(--blk)' : ''}" onclick="U.goal=${g[0]};persist();snd('tap');draw()"><b style="font-size:22px;width:56px">${g[0]}</b><div class="fl1"><b>${g[1]}</b><div class="mu">${g[2]} a day</div></div>${goal() === g[0] ? ic('check', 22) : ''}</div>`).join('');
 }
 
 /* ---------- HOME ---------- */
@@ -159,23 +202,25 @@ function nextCh() {
   if (last >= 0) return last;
   const i = CH.findIndex(ok); return i >= 0 ? i : Math.max(0, CH.findIndex(c => subs().includes(c.s)));
 }
+const updPending = () => LAST.upd && LAST.upd.nb > CFG.build;
 function homeV() {
   const w = wk7(), mx = Math.max(20, ...w.map(x => x.m)), tot = w.reduce((a, x) => a + x.m, 0), ni = nextCh(), nc = CH[ni], [h, m] = hm(tot);
   const gp = P.dxp / goal(), badCount = Q.filter(q => P.bad.includes(q.id)).length;
   const msg = gp >= 1 ? 'Daily goal smashed! Anything extra is a bonus.' : P.dl ? 'Nice work today! One more lesson keeps the streak glowing.' : P.streak ? `You are on a ${P.streak}-day streak. Let's keep it going!` : 'Three short lessons a week builds a habit. I will be right here.';
-  return `<div class="row sp"><div class="row"><button class="av" onclick="tab='me';draw()" aria-label="Profile">${U.av}</button><div><b style="font-size:20px">${esc(U.name)}</b><div class="pu">Student · Level ${lvl()}</div></div></div><div class="chipx" style="background:#FFE9D2"><span class="flame">🔥</span> ${P.streak}</div></div>
-<div class="card go row" style="background:var(--lav);border-radius:32px;padding:20px;margin-top:16px" onclick="startChap(${ni})"><div class="fl1"><b style="font-size:18px">${P.lessons} lessons completed</b><div class="mu" style="margin:2px 0 12px">Next: ${esc(nc.title)} · ${SJ[nc.s].name}</div><div class="bar sh"><i style="width:${Math.max(6, chDone(nc) / 3 * 100)}%"></i></div></div><div class="av" style="background:var(--blk);width:58px;height:58px;color:#fff;font-size:24px">▶</div></div>
-<div class="card row" style="gap:14px"><div style="position:relative;width:78px;height:78px;flex:none">${ring(gp, 78, 10, gp >= 1 ? 'var(--gr)' : 'var(--pu)')}<div style="position:absolute;inset:0;display:grid;place-items:center;font-weight:900;font-size:15px">${gp >= 1 ? '🎯' : Math.round(gp * 100) + '%'}</div></div>
+  const tile = (bg, name, sub, icon, click, cnt) => `<div class="tile" style="background:${bg}" onclick="${click}">${cnt ? `<i class="cnt">${cnt}</i>` : ''}<div>${name}<small>${sub}</small></div><span class="ti">${ic(icon, 34)}</span></div>`;
+  return `<div class="row sp"><div class="row"><span style="position:relative">${avi(U.av, 48, '', 'button', `onclick="tab='me';draw()" aria-label="Profile"`)}${updPending() ? '<i class="dot"></i>' : ''}</span><div><b style="font-size:20px">${esc(U.name)}</b><div class="pu">Student · Level ${lvl()}</div></div></div><div class="chipx glassy" style="color:#B85A00">${ic('flame', 18, 'flame f')} <b>${P.streak}</b></div></div>
+<div class="card go row" style="background:rgba(211,203,255,.7);border-radius:32px;padding:20px;margin-top:16px" onclick="startChap(${ni})"><div class="fl1"><b style="font-size:18px">${P.lessons} lessons completed</b><div class="mu" style="margin:2px 0 12px">Next: ${esc(nc.title)} · ${SJ[nc.s].name}</div><div class="bar sh"><i style="width:${Math.max(6, chDone(nc) / 3 * 100)}%"></i></div></div><span class="playb">${ic('play', 24, 'f')}</span></div>
+<div class="card row" style="gap:14px"><div style="position:relative;width:78px;height:78px;flex:none">${ring(gp, 78, 10, gp >= 1 ? 'var(--gr)' : 'var(--pu)')}<div style="position:absolute;inset:0;display:grid;place-items:center;font-weight:900;font-size:15px">${gp >= 1 ? ic('target', 26) : Math.round(gp * 100) + '%'}</div></div>
 <div class="fl1"><b>Daily goal</b><div class="mu">${Math.min(P.dxp, goal())}/${goal()} XP today</div></div><div>${owl(gp >= 1 ? 'cheer' : 'happy', 56)}</div></div>
 <div class="row" style="align-items:flex-start"><div class="tip" style="margin:0 0 0 8px">${esc(msg)}</div></div>
 <h2>Subjects</h2><div class="mu" style="margin-bottom:12px">Explore your A/L Commerce journey</div>
-<div class="grid">${subs().map(k => `<div class="tile" style="background:${SJ[k].color}" onclick="lsub='${k}';tab='learn';draw()"><div>${SJ[k].name}<small>${subDone(k)}/${subTotal(k)} units done</small></div><span>${SJ[k].icon}</span></div>`).join('')}
-<div class="tile" style="background:var(--pink)" onclick="paper()"><div>Past Paper<small>5 min sprint</small></div><span>📝</span></div>
-<div class="tile" style="background:var(--mint)" onclick="fixMistakes()">${badCount ? `<i class="cnt" style="font-style:normal">${badCount}</i>` : ''}<div>Fix Mistakes<small>${badCount ? 'Retry what you missed' : 'Nothing to fix'}</small></div><span>🛠️</span></div>
-<div class="tile" style="background:var(--pe)" onclick="startWritten()"><div>Written<small>Structured answers</small></div><span>✍️</span></div>
-<div class="tile" style="background:var(--lav)" onclick="toast('Duels need internet. Coming with the online version')"><div>Duels<small>Coming soon</small></div><span>⚔️</span></div></div>
+<div class="grid">${subs().map(k => tile(SJ[k].color, SJ[k].name, `${subDone(k)}/${subTotal(k)} units done`, SJ[k].icon, `lsub='${k}';tab='learn';draw()`)).join('')}
+${tile('var(--pink)', 'Past Paper', '5 min sprint', 'file-text', 'paper()')}
+${tile('var(--mint)', 'Fix Mistakes', badCount ? 'Retry what you missed' : 'Nothing to fix', 'wrench', 'fixMistakes()', badCount)}
+${tile('var(--pe)', 'Written', 'Structured answers', 'pen-line', 'startWritten()')}
+${tile('var(--lav)', 'Duels', 'Coming soon', 'swords', "toast('Duels need internet. Coming with the online version')")}</div>
 <div class="blk"><div style="font-size:13px;color:#fffa">Progress Learning · last 7 days</div><div class="bt"><b>${h}</b><small>hr </small><b>${m}</b><small>min</small></div>
-<div class="bars">${w.map((x, i) => `<div>${i === 6 ? `<em>${x.m}m</em>` : ''}<i class="${i === 6 ? 'hi' : ''}" style="height:${Math.max(14, x.m / mx * 92)}px"></i>${x.l}</div>`).join('')}</div></div>`;
+<div class="bars">${w.map((x, i) => `<div>${i === 6 ? `<em>${x.m}m</em>` : ''}<i class="${i === 6 ? 'hi' : ''}" style="height:${Math.max(14, x.m / mx * 92)}px;animation-delay:${i * 60}ms"></i>${x.l}</div>`).join('')}</div></div>`;
 }
 
 /* ---------- LEARN (winding path) ---------- */
@@ -186,29 +231,30 @@ function learnV() {
     const d = chDone(c);
     const nodes = [0, 1, 2].map(k => {
       const st = k < d ? 'done' : k === d ? 'cur' : 'lock', x = xs[k];
-      const ic = st === 'done' ? '⭐' : st === 'lock' ? '🔒' : [c.icon, '💪', '🏆'][k];
+      const icn = st === 'done' ? ic('star', 32, 'f') : st === 'lock' ? ic('lock', 28) : ic([c.icon, 'dumbbell', 'trophy'][k], 32);
       const m = (i === curI && st === 'cur') ? `<div class="mas ${x < 0 ? 'r' : 'l'}">${owl('happy', 62)}</div><div class="start">START</div>` : '';
-      return `<div class="nw" style="transform:translateX(${x}px)">${m}<button class="node ${st}" onclick="tapNode(${i},${k})" aria-label="${esc(c.title)} ${names[k]}">${ic}</button><div class="nlab">${names[k]}</div></div>`;
+      return `<div class="nw" style="transform:translateX(${x}px);--d:${(u * 3 + k) * 70}ms">${m}<button class="node ${st}" onclick="tapNode(${i},${k})" aria-label="${esc(c.title)} ${names[k]}">${icn}</button><div class="nlab">${names[k]}</div></div>`;
     }).join('');
-    return `<div class="ban" style="background:${SJ[c.s].color}"><div><small>UNIT ${u + 1} · ${d}/3</small><b>${c.icon} ${esc(c.title)}</b></div><button class="nb" onclick="openNotes(${i},'view')" aria-label="Notes">📖</button></div><div class="path">${nodes}</div>`;
+    return `<div class="ban" style="background:${SJ[c.s].color}"><div><small>UNIT ${u + 1} · ${d}/3</small><b>${ic(c.icon, 20)} ${esc(c.title)}</b></div><button class="nb" onclick="openNotes(${i},'view')" aria-label="Notes">${ic('book-open', 20)}</button></div><div class="path">${nodes}</div>`;
   }).join('');
   return `<h1 class="c" style="font-size:23px">Check your learning roadmap and upcoming lessons</h1>
-<div class="row wr" style="justify-content:center;margin:10px 0">${subs().map(k => `<button class="chip ${k === lsub ? 'on' : ''}" onclick="lsub='${k}';draw()">${SJ[k].icon} ${SJ[k].name}</button>`).join('')}</div>
-<div class="card row sp" style="padding:14px 8px">${wk7().map(x => `<div class="c mu fl1">${x.l}<div style="width:34px;height:34px;border-radius:50%;margin:5px auto 0;display:grid;place-items:center;color:#fff;font-size:15px;background:${P.days[x.k] ? 'var(--blk)' : '#EFEDF7'}">${P.days[x.k] ? '🎓' : ''}</div></div>`).join('')}</div>
+<div class="row wr" style="justify-content:center;margin:10px 0">${subs().map(k => `<button class="chip ${k === lsub ? 'on' : ''}" onclick="lsub='${k}';snd('tap');draw()">${sicon(k)} ${SJ[k].name}</button>`).join('')}</div>
+<div class="card row sp" style="padding:14px 8px">${wk7().map((x, i) => `<div class="c mu fl1">${x.l}<div class="wd ${P.days[x.k] ? 'on' : ''}" style="animation-delay:${i * 50}ms">${P.days[x.k] ? ic('graduation-cap', 17) : ''}</div></div>`).join('')}</div>
 <h2>My Courses</h2>${path || '<div class="card c mu">No units yet for this subject.</div>'}`;
 }
 function tapNode(i, k) {
   const c = CH[i], d = chDone(c);
-  if (k > d) { snd('no'); return toast('Finish the earlier lesson first') }
-  snd('tap'); startChap(i, k);
+  if (k > d) { snd('no'); buzz(30); return toast('Finish the earlier lesson first') }
+  snd('tap'); buzz(12); startChap(i, k);
 }
 
 /* ---------- NOTES ---------- */
 function openNotes(i, how) { N = { i, n: 0, how }; scr = 'notes'; snd('tap'); draw() }
 function notesV() {
   const c = CH[N.i], nt = c.notes, k = nt[N.n], last = N.n === nt.length - 1;
-  return `<div class="q"><div class="top"><button class="x" onclick="scr='app';draw()" aria-label="Close">✕</button><div class="dots">${nt.map((_, j) => `<i class="${j <= N.n ? 'on' : ''}"></i>`).join('')}</div></div>
-<div class="note" style="background:${SJ[c.s].color}"><div class="em">${c.icon}</div><div class="mu" style="color:#0009;font-weight:800">${esc(c.title)} · Note ${N.n + 1}/${nt.length}</div><h2>${esc(k.h)}</h2><p>${esc(k.b)}</p>${k.k ? `<div class="key">${esc(k.k)}</div>` : ''}</div>
+  return `<div class="q"><div class="top"><button class="x" onclick="scr='app';draw()" aria-label="Close">${ic('x', 20)}</button><div class="dots">${nt.map((_, j) => `<i class="${j <= N.n ? 'on' : ''}"></i>`).join('')}</div></div>
+<div class="note" style="background:linear-gradient(160deg,${SJ[c.s].color},rgba(255,255,255,.7))"><div class="em">${ic(c.icon, 56)}</div><div class="mu" style="color:#0009;font-weight:800">${esc(c.title)} · Note ${N.n + 1}/${nt.length}</div><h2>${esc(k.h)}</h2><p>${esc(k.b)}</p>${k.k ? `<div class="key">${esc(k.k)}</div>` : ''}</div>
+<p class="mu c" style="margin:0 0 6px">Swipe or tap to continue</p>
 <div class="row">${N.n ? '<button class="pill w" style="flex:1" onclick="N.n--;snd(\'tap\');draw()">Back</button>' : ''}<button class="pill pu2" style="flex:2" onclick="nextNote()">${last ? (N.how === 'learn' ? 'Start lesson' : 'Done') : 'Next'}</button></div></div>`;
 }
 function nextNote() {
@@ -217,6 +263,12 @@ function nextNote() {
   const i = N.i, how = N.how; N = null; scr = 'app';
   how === 'learn' ? beginChap(i, 0) : draw();
 }
+let tx = null;
+document.addEventListener('touchstart', e => { tx = scr === 'notes' ? e.touches[0].clientX : null }, { passive: true });
+document.addEventListener('touchend', e => {
+  if (tx == null || scr !== 'notes' || !N) return; const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (dx < -60 && N.n < CH[N.i].notes.length - 1) { N.n++; snd('tap'); draw() } else if (dx > 60 && N.n > 0) { N.n--; snd('tap'); draw() }
+}, { passive: true });
 
 /* ---------- LESSON SETUP ---------- */
 function startChap(i, k) {
@@ -234,7 +286,7 @@ function beginChap(i, no) {
 function paper() { go(shuf(Q.filter(q => subs().includes(q.s))).slice(0, 8), { mode: 'paper' }) }
 function fixMistakes() {
   const l = shuf(Q.filter(q => P.bad.includes(q.id))).slice(0, 8);
-  if (!l.length) return toast('No mistakes to fix. Great job! 🎉');
+  if (!l.length) return toast('No mistakes to fix. Great job!');
   go(l, { mode: 'fix' });
 }
 function go(qs, o) {
@@ -250,7 +302,7 @@ function initQ() {
   if (q.t === 'match') { const ix = q.pairs.map((_, i) => i); L.mt = { l: shuf(ix), r: shuf(ix), sl: null, sr: null, done: [], miss: 0, bad: false } }
   if (q.t === 'order') { const ix = q.items.map((_, i) => i); let b = shuf(ix), n = 0; while (ix.length > 1 && b.join() === ix.join() && n++ < 9) b = shuf(ix); L.od = { bank: b, ans: [] } }
 }
-const heartsHtml = () => '❤️'.repeat(Math.max(0, L.h)) + '🖤'.repeat(Math.max(0, 3 - L.h));
+const heartsHtml = () => [0, 1, 2].map(i => `<span class="ht ${i < L.h ? '' : 'off'} ${L.ans && !L.good && i === L.h ? 'brk' : ''}">${ic('heart', 22, i < L.h ? 'f' : '')}</span>`).join('');
 
 /* ---------- LESSON SCREEN ---------- */
 const OK_MSG = ['Correct!', 'Nice one!', 'You nailed it!', 'Brilliant!', 'Spot on!', 'Great work!'];
@@ -261,7 +313,7 @@ function correctText(q) {
 }
 function qBody(q, on) {
   if (q.t === 'mcq') return L.o.map((o, i) => `<button class="opt ${on ? (o === q.a ? 'ok' : i === L.sel ? 'no' : '') : (L.sel === i ? 'sel' : '')}" ${on ? 'disabled' : ''} onclick="pick(${i})"><i>${'ABCD'[i]}</i>${esc(o)}</button>`).join('');
-  if (q.t === 'tf') return `<div class="tfs">${[true, false].map(v => `<button class="tfb ${on ? (v === q.a ? 'ok' : v === L.sel ? 'no' : '') : (L.sel === v ? 'sel' : '')}" ${on ? 'disabled' : ''} onclick="pick(${v})">${v ? '✓ True' : '✗ False'}</button>`).join('')}</div>`;
+  if (q.t === 'tf') return `<div class="tfs">${[true, false].map(v => `<button class="tfb ${on ? (v === q.a ? 'ok' : v === L.sel ? 'no' : '') : (L.sel === v ? 'sel' : '')}" ${on ? 'disabled' : ''} onclick="pick(${v})">${ic(v ? 'check' : 'x', 22)}<span>${v ? 'True' : 'False'}</span></button>`).join('')}</div>`;
   if (q.t === 'fill') return `<input id="fi" class="fi ${on ? (L.good ? 'ok' : 'no') : ''}" ${on ? 'disabled' : ''} value="${esc(L.val)}" placeholder="Type here" autocomplete="off" autocapitalize="none" oninput="L.val=this.value;$('#ck').disabled=!this.value.trim()" onkeydown="if(event.key=='Enter'&&L.val.trim())chk()">`;
   if (q.t === 'match') {
     const m = L.mt, cell = (side, i) => {
@@ -281,17 +333,17 @@ function lessonV() {
   const q = L.qs[L.i], on = L.ans;
   const ready = q.t === 'mcq' || q.t === 'tf' ? L.sel != null : q.t === 'fill' ? !!L.val.trim() : q.t === 'order' ? L.od.ans.length === q.items.length : false;
   const right = on && L.good, msg = right ? OK_MSG[L.i % OK_MSG.length] : NO_MSG[L.i % NO_MSG.length];
-  return `<div class="q"><div class="top"><button class="x" onclick="quit()" aria-label="Close">✕</button><span class="chipx">Question ${L.i + 1}/${L.qs.length}</span><span class="fl1"></span>${L.mode === 'paper' ? '<b id="tm" class="timer">5:00</b>' : L.mode === 'chap' ? '<b class="hearts">' + heartsHtml() + '</b>' : ''}</div>
+  return `<div class="q"><div class="top"><button class="x" onclick="quit()" aria-label="Close">${ic('x', 20)}</button><span class="chipx glassy">Question ${L.i + 1}/${L.qs.length}</span><span class="fl1"></span>${L.cb > 1 ? `<span class="cmb" key="${L.cb}">${ic('flame', 15, 'f')} x${L.cb}</span>` : ''}${L.mode === 'paper' ? '<b id="tm" class="timer">5:00</b>' : L.mode === 'chap' ? '<b class="hearts">' + heartsHtml() + '</b>' : ''}</div>
 <div class="bar" style="margin:14px 0;background:#DAD6EE"><i style="background:var(--pu);width:${(L.i + (on ? 1 : 0)) / L.qs.length * 100}%"></i></div>
-<div class="mu">${SJ[q.s].icon} ${esc(q.c)}${L.cb > 1 ? ` · <b style="color:var(--or)">Combo x${L.cb} 🔥</b>` : ''}</div>
+<div class="mu row" style="gap:6px">${sicon(q.s, 15)} ${esc(q.c)}</div>
 <div class="blk ${L.enter ? 'enter' : ''}" style="margin-top:8px"><div class="lbl">${LABEL[q.t]}</div><div class="qt">${esc(q.q)}</div>${qBody(q, on)}</div>
-${on ? `<div style="height:290px"></div><div class="sheet" style="background:${right ? '#D9F6E8' : '#FFE0F4'}"><div>${right ? `<span class="fxp">+${L.xpq} XP</span>` : ''}<div class="row">${owl(right ? 'cheer' : 'sad', 62)}<b style="font-size:19px">${right ? msg + (L.cb > 1 ? ' Combo x' + L.cb + ' 🔥' : '') : msg}</b></div>${right ? '' : `<p style="margin:8px 0 0"><b>Correct answer: ${esc(correctText(q))}</b></p>`}<p style="font-size:13px;margin:6px 0 0">${esc(q.e)}</p>${q.src ? `<p class="mu" style="margin:4px 0 0">Source: ${esc(q.src)}</p>` : ''}<button class="pill ${right ? 'gr' : ''}" onclick="nx()">Continue</button></div></div>`
+${on ? `<div style="height:290px"></div><div class="sheet" style="background:${right ? 'rgba(217,246,232,.86)' : 'rgba(255,224,244,.88)'}"><div>${right ? `<span class="fxp">+${L.xpq} XP</span>` : ''}<div class="row">${owl(right ? 'cheer' : 'sad', 62)}<b style="font-size:19px">${right ? msg + (L.cb > 1 ? ' Combo x' + L.cb : '') : msg}</b></div>${right ? '' : `<p style="margin:8px 0 0"><b>Correct answer: ${esc(correctText(q))}</b></p>`}<p style="font-size:13px;margin:6px 0 0">${esc(q.e)}</p>${q.src ? `<p class="mu" style="margin:4px 0 0">Source: ${esc(q.src)}</p>` : ''}<button class="pill ${right ? 'gr' : ''}" onclick="nx()">Continue</button></div></div>`
       : q.t === 'match' ? '<p class="mu c" style="margin-top:18px">Tap one item on the left, then its partner on the right.</p>'
         : `<button id="ck" class="pill pu2" ${ready ? '' : 'disabled'} onclick="chk()">Check</button>`}</div>`;
 }
-function pick(v) { if (L.ans) return; L.sel = v; snd('tap'); draw() }
+function pick(v) { if (L.ans) return; L.sel = v; snd('tap'); buzz(8); draw() }
 function otap(side, i) {
-  if (L.ans) return; const od = L.od; snd('tap');
+  if (L.ans) return; const od = L.od; snd('tap'); buzz(8);
   if (side === 'b') { od.bank = od.bank.filter(x => x !== i); od.ans.push(i) } else { od.ans = od.ans.filter(x => x !== i); od.bank.push(i) }
   draw();
 }
@@ -335,6 +387,7 @@ function settle(ok) {
     snd('no'); buzz([60, 40, 60]);
   }
   draw();
+  if (ok) burst(innerWidth / 2, innerHeight - 220, L.cb > 2 ? 26 : 16);
 }
 function nx() {
   if ((L.mode === 'chap' && L.h <= 0) || L.i >= L.qs.length - 1) return fin();
@@ -344,23 +397,23 @@ function quit() { if (L && L.iv) clearInterval(L.iv); L = null; draw() }
 
 /* ---------- WRITTEN PRACTICE ---------- */
 function startWritten() {
-  const pool = shuf(WRITTEN.filter(w => subs().includes(w.s))).slice(0, 4);
+  const pool = shuf(WR.filter(w => subs().includes(w.s))).slice(0, 4);
   if (!pool.length) return toast('No written questions yet');
   L = { mode: 'written', qs: pool, i: 0, rev: false, tick: [], txt: '', sc: 0, tot: 0, xp: 0, t0: Date.now(), enter: true };
   scr = 'app'; draw();
 }
 function writtenV() {
   const q = L.qs[L.i], got = Math.min(L.tick.length, q.marks);
-  return `<div class="q"><div class="top"><button class="x" onclick="quit()" aria-label="Close">✕</button><span class="chipx">Written ${L.i + 1}/${L.qs.length}</span><span class="fl1"></span><b>${q.marks} mark${q.marks > 1 ? 's' : ''}</b></div>
+  return `<div class="q"><div class="top"><button class="x" onclick="quit()" aria-label="Close">${ic('x', 20)}</button><span class="chipx glassy">Written ${L.i + 1}/${L.qs.length}</span><span class="fl1"></span><b>${q.marks} mark${q.marks > 1 ? 's' : ''}</b></div>
 <div class="bar" style="margin:14px 0;background:#DAD6EE"><i style="background:var(--pu);width:${(L.i + (L.rev ? 1 : 0)) / L.qs.length * 100}%"></i></div>
-<div class="mu">${SJ[q.s].icon} ${SJ[q.s].name}</div>
+<div class="mu row" style="gap:6px">${sicon(q.s, 15)} ${SJ[q.s].name}</div>
 <div class="blk ${L.enter ? 'enter' : ''}" style="margin-top:8px"><div class="lbl">Write your answer</div><div class="qt">${esc(q.q)}</div>
 <textarea class="ta" placeholder="Write it in your own words (or on paper)…" oninput="L.txt=this.value">${esc(L.txt)}</textarea></div>
-${L.rev ? `<div class="blk" style="margin-top:0"><div class="lbl">Marking points · tick what you covered</div>${q.pts.map((p, i) => `<button class="pt ${L.tick.includes(i) ? 'on' : ''}" onclick="wtick(${i})"><i>${L.tick.includes(i) ? '✓' : ''}</i>${esc(p)}</button>`).join('')}<p class="mu" style="color:#fffa;margin:10px 0 0">Full marks need ${q.marks} correct point${q.marks > 1 ? 's' : ''}. Be honest, it only helps you!</p></div>
-<button class="pill pu2" onclick="wnext()">${got >= q.marks ? '🎉 ' : ''}Score ${got}/${q.marks} · ${L.i >= L.qs.length - 1 ? 'Finish' : 'Next'}</button>`
+${L.rev ? `<div class="blk" style="margin-top:0"><div class="lbl">Marking points · tick what you covered</div>${q.pts.map((p, i) => `<button class="pt ${L.tick.includes(i) ? 'on' : ''}" onclick="wtick(${i})"><i>${L.tick.includes(i) ? ic('check', 16) : ''}</i>${esc(p)}</button>`).join('')}<p class="mu" style="color:#fffa;margin:10px 0 0">Full marks need ${q.marks} correct point${q.marks > 1 ? 's' : ''}. Be honest, it only helps you!</p></div>
+<button class="pill pu2" onclick="wnext()">Score ${got}/${q.marks} · ${L.i >= L.qs.length - 1 ? 'Finish' : 'Next'}</button>`
       : `<button class="pill pu2" onclick="L.rev=true;L.enter=false;snd('tap');draw()">Show marking points</button>`}</div>`;
 }
-function wtick(i) { const k = L.tick.indexOf(i); k < 0 ? L.tick.push(i) : L.tick.splice(k, 1); snd('tap'); draw() }
+function wtick(i) { const k = L.tick.indexOf(i); k < 0 ? L.tick.push(i) : L.tick.splice(k, 1); snd('tap'); buzz(8); draw() }
 function wnext() {
   const q = L.qs[L.i], got = Math.min(L.tick.length, q.marks);
   L.sc += got; L.tot += q.marks; L.xp += got * 6; if (got >= q.marks) L.xp += 4;
@@ -371,8 +424,8 @@ function wnext() {
 /* ---------- FINISH ---------- */
 function badgeList() {
   const done = CH.filter(c => chDone(c) >= 3).length, all = subs().length > 0 && subs().every(s => subDone(s) >= 1);
-  return [['🔥', 'First Streak', P.streak >= 1], ['📒', 'Unit Pro', done >= 1], ['⚡', 'Combo x5', P.maxcb >= 5], ['🏆', '300 XP', P.xp >= 300],
-  ['🌟', 'Perfect Lesson', P.perf >= 1], ['🗓️', '7-Day Streak', P.best >= 7], ['🛠️', 'Mistake Fixer', P.fixed >= 10], ['🎓', 'All-Rounder', all], ['✍️', 'Wordsmith', P.wrote >= 1], ['⏱️', 'Paper Racer', P.papers >= 1]];
+  return [['flame', 'First Streak', P.streak >= 1], ['book-check', 'Unit Pro', done >= 1], ['zap', 'Combo x5', P.maxcb >= 5], ['trophy', '300 XP', P.xp >= 300],
+  ['star', 'Perfect Lesson', P.perf >= 1], ['calendar-check', '7-Day Streak', P.best >= 7], ['wrench', 'Mistake Fixer', P.fixed >= 10], ['graduation-cap', 'All-Rounder', all], ['pen-line', 'Wordsmith', P.wrote >= 1], ['timer', 'Paper Racer', P.papers >= 1]];
 }
 function fin() {
   if (!L) return; const r = L; if (r.iv) clearInterval(r.iv);
@@ -405,66 +458,120 @@ function resV() {
   const acc = R.n ? Math.round(R.right / R.n * 100) : 0, m = Math.floor(R.secs / 60), s = R.secs % 60;
   return `${R.fail ? '' : `<div class="cf">${cf}</div>`}<div class="q c" style="padding-top:26px;position:relative">${owl(R.fail ? 'sad' : 'cheer', 180)}
 <div id="xpn" style="font-size:50px;font-weight:900;color:var(--bu)">+${R.g} XP</div>
-<p class="mu" style="color:#fffa;font-size:15px">${R.fail ? 'Out of hearts. Review and try again!' : R.written ? 'Written practice done! ' + R.right + '/' + R.n + ' marks' : R.perfect ? 'Perfect lesson! Flawless 🌟' : 'Lesson complete! ' + R.right + '/' + R.n + ' correct'}</p>
-${R.up ? `<div class="lvl">🎉 Level up! You are now Level ${lvl()}</div>` : ''}
-${R.unitDone ? '<div class="lvl" style="background:linear-gradient(135deg,var(--mint),var(--sky))">🎓 Unit complete!</div>' : ''}
+<p class="mu" style="color:#fffa;font-size:15px">${R.fail ? 'Out of hearts. Review and try again!' : R.written ? 'Written practice done! ' + R.right + '/' + R.n + ' marks' : R.perfect ? 'Perfect lesson! Flawless.' : 'Lesson complete! ' + R.right + '/' + R.n + ' correct'}</p>
+${R.up ? `<div class="lvl">${ic('party-popper', 26)} Level up! You are now Level ${lvl()}</div>` : ''}
+${R.unitDone ? `<div class="lvl" style="background:linear-gradient(135deg,var(--mint),var(--sky))">${ic('graduation-cap', 26)} Unit complete!</div>` : ''}
 <div class="row" style="margin:18px 0 8px"><div class="stat"><b>${acc}%</b><span>Accuracy</span></div><div class="stat"><b>x${R.bc}</b><span>Best combo</span></div><div class="stat"><b>${m}:${String(s).padStart(2, '0')}</b><span>Time</span></div></div>
-${R.streakNew ? `<div class="card" style="background:#FFE9D2;margin:8px 0"><div class="row"><span class="flame" style="font-size:34px">🔥</span><div style="text-align:left"><b style="font-size:18px">${P.streak} day streak!</b><div class="mu">You practised today. Come back tomorrow.</div></div></div></div>` : ''}
-${R.nb.map(b => `<div class="card" style="background:var(--bu);margin:8px 0;text-align:left"><b>${b[0]} New badge: ${esc(b[1])}</b></div>`).join('')}
-<div class="card" style="background:var(--lav);margin-top:14px;text-align:left"><div class="row sp mu"><span>Total XP</span><b>Level ${lvl()}</b></div><div style="font-size:32px;font-weight:900">${P.xp}</div><div class="bar sh"><i style="width:${P.xp % 300 / 3}%"></i></div><div class="mu" style="margin-top:8px">Daily goal: ${Math.min(P.dxp, goal())}/${goal()} XP</div></div>
+${R.streakNew ? `<div class="card" style="background:rgba(255,233,210,.9);margin:8px 0"><div class="row">${ic('flame', 38, 'flame f')}<div style="text-align:left;color:var(--ink)"><b style="font-size:18px">${P.streak} day streak!</b><div class="mu">You practised today. Come back tomorrow.</div></div></div></div>` : ''}
+${R.nb.map(b => `<div class="card" style="background:rgba(255,230,128,.92);margin:8px 0;text-align:left"><div class="row" style="color:var(--ink)">${ic(b[0], 24)}<b>New badge: ${esc(b[1])}</b></div></div>`).join('')}
+<div class="card" style="background:rgba(211,203,255,.9);margin-top:14px;text-align:left;color:var(--ink)"><div class="row sp mu"><span>Total XP</span><b>Level ${lvl()}</b></div><div style="font-size:32px;font-weight:900">${P.xp}</div><div class="bar sh"><i style="width:${P.xp % 300 / 3}%"></i></div><div class="mu" style="margin-top:8px">Daily goal: ${Math.min(P.dxp, goal())}/${goal()} XP</div></div>
 <button class="pill w" onclick="scr='app';draw()">Continue</button></div>`;
 }
 
 /* ---------- QUESTS / PROGRESS ---------- */
 function questsV() {
   const qs = [[`Earn ${goal()} XP`, P.dxp, goal()], ['Finish 1 lesson', P.dl, 1], ['Get a 3x combo', P.dcb, 3]], all = qs.every(x => x[1] >= x[2]);
-  const done = CH.filter(c => chDone(c) >= 3).length, pct = Math.round(done / CH.length * 100), bd = badgeList();
-  return `<h1>My Progress</h1><div class="row" style="margin:14px 0"><div class="card fl1" style="background:var(--mint);margin:0"><span class="mu" style="color:#0008">Completed</span><div style="font-size:30px;font-weight:900">${pct}%</div></div><div class="card fl1" style="background:var(--lav);margin:0"><span class="mu" style="color:#0008">Lessons</span><div style="font-size:30px;font-weight:900">${P.lessons}</div></div></div>
-<div class="card"><div class="row"><div class="av" style="background:var(--or);width:54px;height:54px;color:#fff;font-size:24px;font-weight:900">${P.streak}</div><b style="font-size:17px">Day streak. Keep it alive!</b></div><div class="row sp" style="margin-top:14px">${wk7().map(x => `<div class="c mu"><div style="width:34px;height:34px;border-radius:50%;margin-bottom:4px;display:grid;place-items:center;color:#fff;background:${P.days[x.k] ? 'var(--blk)' : '#EFEDF7'}">${P.days[x.k] ? '✓' : ''}</div>${x.l}</div>`).join('')}</div></div>
-<h2>Today's quests</h2>${qs.map(x => `<div class="card"><div class="row sp"><b>${x[1] >= x[2] ? '✅' : '⭕'} ${esc(x[0])}</b><span class="mu">${Math.min(x[1], x[2])}/${x[2]}</span></div><div class="bar" style="margin-top:10px"><i style="background:var(--pu);width:${Math.min(100, x[1] / x[2] * 100)}%"></i></div></div>`).join('')}
-<button class="pill pu2" ${all && P.chest !== today() ? '' : 'disabled'} onclick="chest()">${P.chest === today() ? '🎁 Chest opened. Back tomorrow' : all ? '🎁 Open your daily chest' : '🔒 Finish all quests for a chest'}</button>
-<h2>Badges <span class="mu">${bd.filter(b => b[2]).length}/${bd.length}</span></h2><div class="bdg">${bd.map(b => `<div><b style="background:${b[2] ? 'var(--bu)' : '#E6E2F5'};opacity:${b[2] ? 1 : .4}">${b[0]}</b>${esc(b[1])}</div>`).join('')}</div>
-<h2>Units by subject</h2>${subs().map(k => `<div class="card" style="margin:8px 0"><div class="row sp"><b>${SJ[k].icon} ${SJ[k].name}</b><span class="mu">${subDone(k)}/${subTotal(k)}</span></div><div class="bar" style="margin-top:10px"><i style="background:${SJ[k].color};filter:saturate(1.6) brightness(.85);width:${subDone(k) / Math.max(1, subTotal(k)) * 100}%"></i></div></div>`).join('')}`;
+  const done = CH.filter(c => chDone(c) >= 3).length, pct = Math.round(done / Math.max(1, CH.length) * 100), bd = badgeList();
+  return `<h1>My Progress</h1><div class="row" style="margin:14px 0"><div class="card fl1" style="background:rgba(169,235,203,.75);margin:0"><span class="mu" style="color:#0008">Completed</span><div style="font-size:30px;font-weight:900">${pct}%</div></div><div class="card fl1" style="background:rgba(211,203,255,.75);margin:0"><span class="mu" style="color:#0008">Lessons</span><div style="font-size:30px;font-weight:900">${P.lessons}</div></div></div>
+<div class="card"><div class="row"><div class="streakn">${P.streak}</div><b style="font-size:17px">Day streak. Keep it alive!</b></div><div class="row sp" style="margin-top:14px">${wk7().map((x, i) => `<div class="c mu"><div class="wd2 ${P.days[x.k] ? 'on' : ''}" style="animation-delay:${i * 50}ms">${P.days[x.k] ? ic('check', 16) : ''}</div>${x.l}</div>`).join('')}</div></div>
+<h2>Today's quests</h2>${qs.map(x => `<div class="card"><div class="row sp"><b class="row" style="gap:8px">${ic('circle-check', 22, x[1] >= x[2] ? 'okc' : 'dim')} ${esc(x[0])}</b><span class="mu">${Math.min(x[1], x[2])}/${x[2]}</span></div><div class="bar" style="margin-top:10px"><i style="background:var(--pu);width:${Math.min(100, x[1] / x[2] * 100)}%"></i></div></div>`).join('')}
+<button class="pill pu2 ${all && P.chest !== today() ? 'chestr' : ''}" ${all && P.chest !== today() ? '' : 'disabled'} onclick="chest()"><span class="row" style="justify-content:center;gap:8px">${ic(all && P.chest !== today() ? 'gift' : 'lock', 20)} ${P.chest === today() ? 'Chest opened. Back tomorrow' : all ? 'Open your daily chest' : 'Finish all quests for a chest'}</span></button>
+<h2>Badges <span class="mu">${bd.filter(b => b[2]).length}/${bd.length}</span></h2><div class="bdg">${bd.map(b => `<div><b class="${b[2] ? 'got' : ''}">${ic(b[0], 30)}</b>${esc(b[1])}</div>`).join('')}</div>
+<h2>Units by subject</h2>${subs().map(k => `<div class="card" style="margin:8px 0"><div class="row sp"><b class="row" style="gap:8px">${sicon(k, 20)} ${SJ[k].name}</b><span class="mu">${subDone(k)}/${subTotal(k)}</span></div><div class="bar" style="margin-top:10px"><i style="background:${SJ[k].color};filter:saturate(1.6) brightness(.85);width:${subDone(k) / Math.max(1, subTotal(k)) * 100}%"></i></div></div>`).join('')}`;
 }
-function chest() { const g = 20 + Math.floor(Math.random() * 41); addXp(g); P.chest = today(); persist(); snd('chest'); buzz([40, 40, 80]); toast('Chest: +' + g + ' XP 🎉'); draw() }
+function chest() {
+  const g = 20 + Math.floor(Math.random() * 41); addXp(g); P.chest = today(); persist(); snd('chest'); buzz([40, 40, 80]);
+  burst(innerWidth / 2, innerHeight - 160, 30); toast('Chest: +' + g + ' XP'); draw();
+}
 
 /* ---------- RANKS + PROFILE ---------- */
 function ranksV() {
   const us = Object.keys(ld('al3:users') || {}).map(u => { const d = ld('al3:d:' + u); if (!d || !d.U) return null; return { n: d.U.name || u, a: d.U.av, x: d.P.wk === wkOf() ? d.P.wxp : 0, s: d.P.streak } }).filter(Boolean).sort((a, b) => b.x - a.x);
-  const p = (r, rk, h, c) => r ? `<div><div class="av" style="width:${rk === 1 ? 66 : 54}px;height:${rk === 1 ? 66 : 54}px;background:#fff;font-size:${rk === 1 ? 34 : 28}px">${r.a}</div>${esc(r.n)}<span style="background:#fff;border-radius:14px;padding:3px 10px;font-size:12px">⭐ ${r.x}</span><div class="b" style="height:${h}px;background:${c}">${rk}</div></div>` : '<div></div>';
-  return `<div class="row sp"><h1>Leaderboard</h1><span class="chipx" style="background:#fff7">This week</span></div><div class="pod">${p(us[1], 2, 110, 'var(--pu)')}${p(us[0], 1, 150, 'var(--bu)')}${p(us[2], 3, 85, 'var(--pink)')}</div>
-<div class="card" style="margin-top:0;border-radius:30px"><b>On this device</b>${us.map((r, i) => `<div class="row" style="margin:12px 0"><b style="width:22px">${i + 1}</b><div class="av" style="width:40px;height:40px;font-size:20px;background:var(--bg)">${r.a}</div><b class="fl1">${esc(r.n)}</b><span class="mu">⭐ ${r.x} · 🔥${r.s}</span></div>`).join('')}<div class="mu" style="margin-top:8px">A shared online leaderboard for all your friends arrives with the online version.</div></div>`;
+  const p = (r, rk, h, c) => r ? `<div>${avi(r.a, rk === 1 ? 66 : 54)}${esc(r.n)}<span class="xpb">${ic('star', 12, 'f')} ${r.x}</span><div class="b" style="height:${h}px;background:${c}">${rk}</div></div>` : '<div></div>';
+  return `<div class="row sp"><h1>Leaderboard</h1><span class="chipx glassy">This week</span></div><div class="pod">${p(us[1], 2, 110, 'rgba(123,99,232,.85)')}${p(us[0], 1, 150, 'rgba(255,230,128,.95)')}${p(us[2], 3, 85, 'rgba(255,184,238,.9)')}</div>
+<div class="card" style="margin-top:0;border-radius:30px"><b>On this device</b>${us.map((r, i) => `<div class="row" style="margin:12px 0"><b style="width:22px">${i + 1}</b>${avi(r.a, 40)}<b class="fl1">${esc(r.n)}</b><span class="mu row" style="gap:3px">${ic('star', 13, 'f')} ${r.x} · ${ic('flame', 13, 'f flame')} ${r.s}</span></div>`).join('')}<div class="mu" style="margin-top:8px">A shared online leaderboard for all your friends arrives with the online version.</div></div>`;
 }
 function meV() {
-  return `<div class="row sp"><h1>Profile</h1><button class="x" onclick="tab='home';draw()" aria-label="Close">✕</button></div>
-<div class="card c"><div class="av" style="width:90px;height:90px;font-size:50px;margin:auto">${U.av}</div><h2 style="margin-top:10px">${esc(U.name)}</h2><div class="mu">@${esc(U.u)} · ${esc(U.stream)}</div><div class="row sp" style="margin-top:14px"><div><b>${P.xp}</b><div class="mu">XP</div></div><div><b>${P.streak}</b><div class="mu">Streak</div></div><div><b>${lvl()}</b><div class="mu">Level</div></div></div></div>
-<h2>My subjects</h2><div class="row wr" style="margin-top:10px">${SK.map(k => `<button class="chip ${U.subs.includes(k) ? 'on' : ''}" onclick="tgs('${k}')">${SJ[k].icon} ${SJ[k].name}</button>`).join('')}</div>
+  const extra = Q.filter(q => CH.find(c => c.key === q.key && c.remote)).length, pk = ld('al3:packs');
+  const u = LAST.upd;
+  return `<div class="row sp"><h1>Profile</h1><button class="x" onclick="tab='home';draw()" aria-label="Close">${ic('x', 20)}</button></div>
+<div class="card c">${avi(U.av, 90, 'mid')}<h2 style="margin-top:10px">${esc(U.name)}</h2><div class="mu">@${esc(U.u)} · ${esc(U.stream)}</div><div class="row sp" style="margin-top:14px"><div><b>${P.xp}</b><div class="mu">XP</div></div><div><b>${P.streak}</b><div class="mu">Streak</div></div><div><b>${lvl()}</b><div class="mu">Level</div></div></div></div>
+<h2>My subjects</h2><div class="row wr" style="margin-top:10px">${SK.map(k => `<button class="chip ${U.subs.includes(k) ? 'on' : ''}" onclick="tgs('${k}')">${sicon(k)} ${SJ[k].name}</button>`).join('')}</div>
 <h2>Daily goal</h2>${goalPick()}
-<h2>Settings</h2><div class="card"><div class="row sp"><b>🔊 Sound effects</b><button class="sw ${SET.sfx ? 'on' : ''}" onclick="setOpt('sfx')" aria-label="Sound effects"></button></div><div class="row sp" style="margin-top:14px"><b>📳 Vibration</b><button class="sw ${SET.hap ? 'on' : ''}" onclick="setOpt('hap')" aria-label="Vibration"></button></div></div>
+<h2>Updates</h2><div class="card"><div class="row sp"><div><b>App version</b><div class="mu">Build ${CFG.build || 'dev'}${updPending() ? ` · build ${u.nb} available` : ''}</div></div>${updPending() ? '<button class="chip on" onclick="showUpdate(LAST.upd)">Update</button>' : '<button class="chip on" onclick="checkUpdate(true)">Check</button>'}</div>
+<div class="row sp" style="margin-top:16px"><div><b>Question packs</b><div class="mu">${extra ? extra + ' extra questions downloaded' : 'Built-in questions only'}${pk && pk.version != null ? ' · v' + esc(pk.version) : ''}</div></div><button class="chip on" onclick="syncPacks(true)">Sync</button></div></div>
+<h2>Settings</h2><div class="card"><div class="row sp"><b class="row" style="gap:8px">${ic('volume-2', 20)} Sound effects</b><button class="sw ${SET.sfx ? 'on' : ''}" onclick="setOpt('sfx')" aria-label="Sound effects"></button></div><div class="row sp" style="margin-top:14px"><b class="row" style="gap:8px">${ic('vibrate', 20)} Vibration</b><button class="sw ${SET.hap ? 'on' : ''}" onclick="setOpt('hap')" aria-label="Vibration"></button></div></div>
 <button class="pill w" style="margin-top:18px" onclick="step=0;scr='onb';draw()">Edit name and picture</button><p class="mu c">You are using the A/L Streak app.</p><button class="pill" onclick="logout()">Log out</button>`;
 }
 
+/* ---------- updates + question packs (need internet, everything else works offline) ---------- */
+async function checkUpdate(manual) {
+  if (!CFG.repo) { if (manual) toast('Update checks work in the installed app'); return }
+  try {
+    const r = await fetch(`https://api.github.com/repos/${CFG.repo}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json(), body = j.body || '', m = /build:\s*(\d+)/i.exec(body), nb = m ? +m[1] : 0;
+    const notes = body.split('\n').map(x => x.trim()).filter(x => /^[-*]\s/.test(x)).map(x => x.replace(/^[-*]\s+/, ''));
+    const a = (j.assets || []).find(x => /\.apk$/i.test(x.name));
+    LAST.upd = { nb, notes, url: a ? a.browser_download_url : `https://github.com/${CFG.repo}/releases/latest` };
+    if (nb > CFG.build) { if (manual || ld('al3:skip') !== nb) showUpdate(LAST.upd); else if (scr === 'app') draw() }
+    else if (manual) toast("You're on the latest version");
+  } catch (e) { if (manual) toast("Couldn't check. Are you online?") }
+}
+function showUpdate(u) {
+  if (!u) return; snd('chest');
+  $('#modal').innerHTML = `<div class="mod" onclick="if(event.target===this)closeModal()"><div class="sheetm"><div class="mi">${ic('download', 30)}</div><h2 style="margin:10px 0 2px">Update available</h2><p class="mu" style="margin:0 0 12px">Build ${u.nb} is ready. You have build ${CFG.build}.</p>
+${u.notes.length ? `<div class="wn"><b>What's new</b><ul>${u.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
+<button class="pill pu2" onclick="doUpdate()">Update now</button><button class="pill w" onclick="skipUpdate()">Skip this version</button><p class="mu c" style="margin:6px 0 0">The file downloads from GitHub. Open it when it finishes and Android will ask you to confirm.</p></div></div>`;
+}
+function closeModal() { $('#modal').innerHTML = '' }
+function doUpdate() { const u = LAST.upd; closeModal(); toast('Downloading the update…'); setTimeout(() => { location.href = u.url }, 350) }
+function skipUpdate() { if (LAST.upd) sv('al3:skip', LAST.upd.nb); closeModal(); toast('Skipped. You can update any time from Profile.'); if (scr === 'app') draw() }
+
+async function syncPacks(manual) {
+  if (!CFG.repo) { if (manual) toast('Sync works in the installed app'); return }
+  try {
+    const r = await fetch(`https://raw.githubusercontent.com/${CFG.repo}/main/content/packs.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const txt = await r.text(), j = JSON.parse(txt), sig = (j.version || 0) + ':' + txt.length, prev = ld('al3:packsig');
+    if (prev === sig) { if (manual) toast('Questions are up to date'); return }
+    const before = Q.length; sv('al3:packs', j); sv('al3:packsig', sig); buildContent();
+    const add = Q.length - before; if (add > 0 || manual) toast(add > 0 ? add + ' new questions downloaded' : 'Questions are up to date');
+    if (scr === 'app' && !L) draw();
+  } catch (e) { if (manual) toast("Couldn't sync. Are you online?") }
+}
+function startupChecks() { if (checkedUpd || !U || scr !== 'app') return; checkedUpd = true; setTimeout(() => { syncPacks(false); checkUpdate(false) }, 1200) }
+
 /* ---------- render ---------- */
+const NAV = [['home', 'house'], ['learn', 'map'], ['quests', 'trophy'], ['ranks', 'chart-no-axes-column']];
+function buildNav() { $('#nav').innerHTML = '<i class="ind"></i>' + NAV.map(t => `<button aria-label="${t[0]}" onclick="tab='${t[0]}';snd('tap');buzz(8);draw()">${ic(t[1], 24)}</button>`).join('') }
+function navState(show) {
+  const n = $('#nav'), i = NAV.findIndex(t => t[0] === tab);
+  n.style.display = show ? 'flex' : 'none'; n.style.setProperty('--i', Math.max(0, i)); n.classList.toggle('noind', i < 0);
+  n.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === i));
+}
 function draw() {
-  const a = $('#app'), n = $('#nav'); n.style.display = 'none';
+  const a = $('#app');
   document.body.style.background = scr === 'res' ? '#151515' : scr === 'app' && !L ? ({ learn: 'var(--sky)', ranks: 'var(--lav)' }[tab] || 'var(--bg)') : 'var(--bg)';
+  document.body.classList.toggle('dark', scr === 'res');
+  const key = scr + '|' + (scr === 'app' && !L ? tab : '') + (L ? 'L' : ''), changed = key !== lastKey; lastKey = key;
+  a.classList.remove('vin');
   if (scr === 'auth') a.innerHTML = authV();
-  else if (scr === 'onb') a.innerHTML = onbV();
+  else if (scr === 'onb') a.innerHTML = onbV() + '';
   else if (scr === 'res') a.innerHTML = resV();
   else if (scr === 'notes') a.innerHTML = notesV();
   else if (L) a.innerHTML = lessonV();
-  else {
-    n.style.display = 'flex';
-    n.innerHTML = [['home', '🏠'], ['learn', '🗺️'], ['quests', '🏆'], ['ranks', '📊']].map(t => `<button class="${tab === t[0] ? 'on' : ''}" aria-label="${t[0]}" onclick="tab='${t[0]}';snd('tap');draw()">${t[1]}</button>`).join('');
-    a.innerHTML = { home: homeV, learn: learnV, quests: questsV, ranks: ranksV, me: meV }[tab]();
-  }
+  else a.innerHTML = { home: homeV, learn: learnV, quests: questsV, ranks: ranksV, me: meV }[tab]();
+  navState(scr === 'app' && !L);
+  if (changed) { void a.offsetWidth; a.classList.add('vin') }
   if (L) { const was = L.enter; L.enter = false; if (L.mode !== 'written' && !L.ans && L.qs[L.i].t === 'fill' && was) { const f = $('#fi'); if (f) f.focus() } }
-  else if (!(scr === 'app' && L)) window.scrollTo(0, 0);
+  else if (changed) window.scrollTo(0, 0);
   if (migrated && scr === 'app') { migrated = false; setTimeout(() => toast('Business Studies and ICT are now separate subjects. Check them in Profile.'), 400) }
 }
 
 /* Android back button (called from MainActivity). Returns true if handled. */
 window.onBack = function () {
+  if ($('#modal').innerHTML) { closeModal(); return true }
   if (L) { if (Date.now() < backArm) { quit(); return true } backArm = Date.now() + 2000; toast('Press back again to leave this lesson'); return true }
   if (scr === 'notes') { scr = 'app'; draw(); return true }
   if (scr === 'res') { scr = 'app'; draw(); return true }
@@ -474,4 +581,5 @@ window.onBack = function () {
 };
 
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist() } catch (e) { }
-const cur = ld('al3:cur'); if (cur) login(cur); draw();
+buildContent(); buildNav();
+const cur = ld('al3:cur'); if (cur) login(cur); draw(); startupChecks();

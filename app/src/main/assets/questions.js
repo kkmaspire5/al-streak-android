@@ -13,15 +13,16 @@
 //    order(instruction, [items in the CORRECT order], explanation, src)
 //
 //  Subject codes: A = Accounting, B = Business Studies, E = Economics, I = ICT
+//  Icons are names from icons.js (e.g. 'scale', 'globe', 'database').
 //  Keep a chapter's title the same once students have used it (their progress
 //  is saved under the title).
 // ============================================================================
 
 const SUBJECTS = {
-  A: { name: 'Accounting',        icon: '📒', color: '#A9EBCB' },
-  B: { name: 'Business Studies',  icon: '🏢', color: '#FFC9A3' },
-  E: { name: 'Economics',         icon: '📈', color: '#FFE680' },
-  I: { name: 'ICT',               icon: '💻', color: '#A9C0FF' }
+  A: { name: 'Accounting',        icon: 'book-check', color: '#A9EBCB' },
+  B: { name: 'Business Studies',  icon: 'building-2', color: '#FFC9A3' },
+  E: { name: 'Economics',         icon: 'trending-up', color: '#FFE680' },
+  I: { name: 'ICT',               icon: 'laptop', color: '#A9C0FF' }
 };
 
 const mcq   = (q, a, w, e, src) => ({ t: 'mcq',   q, a, w, e, src });
@@ -34,7 +35,7 @@ const ch    = (s, title, icon, notes, qs) => ({ s, title, icon, notes, qs });
 const CHAPTERS = [
 
 // ───────────────────────────── ACCOUNTING ─────────────────────────────
-ch('A', 'Double entry', '📒', [
+ch('A', 'Double entry', 'scale', [
   { h: 'Every deal has two sides', b: 'Each transaction changes at least two accounts. One is debited and one is credited, and the two amounts are equal.', k: 'Total debits = Total credits' },
   { h: 'Which side?', b: 'Assets and expenses increase on the debit side. Liabilities, capital and income increase on the credit side.', k: 'Dr: assets, expenses · Cr: liabilities, capital, income' }
 ], [
@@ -49,7 +50,7 @@ ch('A', 'Double entry', '📒', [
   ], 'Work out which account gains value (debit) and where the value came from (credit).')
 ]),
 
-ch('A', 'Final accounts', '🧾', [
+ch('A', 'Final accounts', 'receipt', [
   { h: 'Gross profit', b: 'Gross profit is what is left of sales after paying for the goods that were sold.', k: 'Gross profit = Sales − Cost of sales' },
   { h: 'Cost of sales', b: 'Not just purchases! Adjust for stock at the start and at the end of the year.', k: 'Opening stock + Purchases − Closing stock' }
 ], [
@@ -59,7 +60,7 @@ ch('A', 'Final accounts', '🧾', [
   tf('Drawings are shown as an expense in the income statement.', false, 'Drawings are the owner\'s withdrawals. They reduce capital and are not an expense of the business.')
 ]),
 
-ch('A', 'Bank reconciliation', '🏦', [
+ch('A', 'Bank reconciliation', 'landmark', [
   { h: 'Two records, one bank balance', b: 'The cash book (your record) and the bank statement (the bank\'s record) often differ because of timing and items you have not yet recorded.', k: 'Update the cash book first, then reconcile' },
   { h: 'Common differences', b: 'Unpresented cheques and uncredited deposits are timing differences. Bank charges, direct debits and dishonoured cheques must be entered in the cash book.', k: 'Timing → reconciliation · Unrecorded → cash book' }
 ], [
@@ -69,7 +70,7 @@ ch('A', 'Bank reconciliation', '🏦', [
   fill('Cash book balance Rs 50,000. Unpresented cheques Rs 8,000. The bank statement balance = Rs ___', ['58000'], 'The bank has not deducted the cheques yet, so the statement shows 50,000 + 8,000 = 58,000.')
 ]),
 
-ch('A', 'Depreciation', '📉', [
+ch('A', 'Depreciation', 'trending-down', [
   { h: 'Why depreciate?', b: 'A machine helps earn money for many years. Depreciation spreads its cost over those years. It is an accounting entry and no cash is paid.', k: 'Depreciation ≠ cash payment' },
   { h: 'Two methods', b: 'Straight-line charges the same amount each year. Reducing balance charges a fixed % of the remaining book value, so the charge falls every year.', k: '(Cost − Residual) ÷ Life' }
 ], [
@@ -80,7 +81,7 @@ ch('A', 'Depreciation', '📉', [
 ]),
 
 // ───────────────────────────── BUSINESS STUDIES ─────────────────────────────
-ch('B', 'Business activities', '🌾', [
+ch('B', 'Business activities', 'sprout', [
   { h: 'Three sectors', b: 'Primary businesses take things from nature. Secondary businesses turn materials into products. Tertiary businesses provide services.', k: 'Primary · Secondary · Tertiary' },
   { h: 'Example: tea', b: 'Plucking tea leaves is primary. Making packed tea is secondary. A shop selling tea, or a bank lending to the estate, is tertiary.' }
 ], [
@@ -94,7 +95,7 @@ ch('B', 'Business activities', '🌾', [
   ], 'Think raw materials → products → services.')
 ]),
 
-ch('B', 'Forms of ownership', '🤝', [
+ch('B', 'Forms of ownership', 'handshake', [
   { h: 'Who owns the business?', b: 'A sole proprietor has one owner. A partnership has two or more owners. A company is owned by shareholders.', k: 'Sole trader · Partnership · Company' },
   { h: 'Liability', b: 'A sole proprietor and partners have unlimited liability. They can lose personal assets. Shareholders of a company have limited liability, and a company is a separate legal entity.', k: 'Limited liability = loss limited to money invested' }
 ], [
@@ -108,7 +109,7 @@ ch('B', 'Forms of ownership', '🤝', [
   ], 'Look at the number of owners and who is liable for the debts.')
 ]),
 
-ch('B', 'Management functions', '🧭', [
+ch('B', 'Management functions', 'compass', [
   { h: 'The management process', b: 'Managers plan what to do, organise people and resources, direct and motivate staff, then control by checking results.', k: 'Plan → Organise → Direct → Control' },
   { h: 'Control closes the loop', b: 'Controlling compares actual results with the plan and takes corrective action. The lessons feed the next plan.' }
 ], [
@@ -123,7 +124,7 @@ ch('B', 'Management functions', '🧭', [
   ], 'Each function has its own job in the management cycle.')
 ]),
 
-ch('B', 'Marketing mix', '📣', [
+ch('B', 'Marketing mix', 'megaphone', [
   { h: 'The 4 Ps', b: 'Product (what we sell), Price (what customers pay), Place (how it reaches them), Promotion (how we tell them about it).', k: 'Product · Price · Place · Promotion' },
   { h: 'Segmentation', b: 'Dividing a market into groups with similar needs lets a business target the right customers with the right mix.' }
 ], [
@@ -139,7 +140,7 @@ ch('B', 'Marketing mix', '📣', [
 ]),
 
 // ───────────────────────────── ECONOMICS ─────────────────────────────
-ch('E', 'Demand & supply', '⚖️', [
+ch('E', 'Demand & supply', 'scale', [
   { h: 'Moving vs shifting', b: 'A change in the good\'s own price moves you along the curve. Any other factor (income, tastes, costs, technology) shifts the whole curve.', k: 'Own price → movement · Other factors → shift' },
   { h: 'Finding equilibrium', b: 'Price settles where demand meets supply. If supply shifts right, the price falls and the quantity traded rises.' }
 ], [
@@ -154,7 +155,7 @@ ch('E', 'Demand & supply', '⚖️', [
   ], 'Own-price changes move along a curve; everything else shifts it.')
 ]),
 
-ch('E', 'Elasticity', '🪢', [
+ch('E', 'Elasticity', 'zap', [
   { h: 'How sensitive?', b: 'Price elasticity of demand (PED) measures how much quantity demanded responds to a price change.', k: 'PED = %ΔQd ÷ %ΔP' },
   { h: 'Reading the number', b: 'Ignoring the sign: above 1 is elastic, below 1 is inelastic, equal to 1 is unitary. Necessities tend to be inelastic.' }
 ], [
@@ -164,7 +165,7 @@ ch('E', 'Elasticity', '🪢', [
   tf('Necessities such as salt usually have inelastic demand.', true, 'People keep buying them even when the price rises.')
 ]),
 
-ch('E', 'National income', '🏛️', [
+ch('E', 'National income', 'landmark', [
   { h: 'What GDP counts', b: 'GDP is the value of final goods and services produced inside a country in a year. Only final output is counted, to avoid double counting.', k: 'GDP = final output within borders' },
   { h: 'What GDP skips', b: 'Transfer payments (like welfare) and second-hand sales do not create new output, so they are left out.' }
 ], [
@@ -174,7 +175,7 @@ ch('E', 'National income', '🏛️', [
   fill('GDP is Rs 900,000 million and the population is 30 million. GDP per capita = Rs ___', ['30000'], '900,000 ÷ 30 = 30,000 per person.')
 ]),
 
-ch('E', 'Market structures', '🏪', [
+ch('E', 'Market structures', 'store', [
   { h: 'A spectrum', b: 'From perfect competition (many price-taking sellers) to monopoly (one seller with high barriers). In between: oligopoly and monopolistic competition.', k: 'Number of sellers · Product type · Entry barriers' },
   { h: 'Profit maximising', b: 'Every firm maximises profit where marginal revenue equals marginal cost.', k: 'MR = MC' }
 ], [
@@ -190,7 +191,7 @@ ch('E', 'Market structures', '🏪', [
 ]),
 
 // ───────────────────────────── ICT ─────────────────────────────
-ch('I', 'Number systems', '🔢', [
+ch('I', 'Number systems', 'binary', [
   { h: 'Binary', b: 'Computers use base 2. Each place is a power of two: 8, 4, 2, 1 for a 4-bit number.', k: '1011₂ = 8 + 2 + 1 = 11' },
   { h: 'Hexadecimal', b: 'Base 16 is a short way to write binary. It uses 0 to 9 and A to F, where A = 10 and F = 15.' }
 ], [
@@ -203,7 +204,7 @@ ch('I', 'Number systems', '🔢', [
   ], 'Add the place values wherever there is a 1.')
 ]),
 
-ch('I', 'Logic gates', '🔌', [
+ch('I', 'Logic gates', 'cpu', [
   { h: 'Gates in one line each', b: 'AND needs both inputs 1. OR needs at least one input 1. NOT flips the input. XOR is 1 when the inputs differ.', k: 'AND · OR · NOT · XOR' },
   { h: 'Combined gates', b: 'NAND is AND followed by NOT. NOR is OR followed by NOT. Their outputs are the opposite of AND and OR.' }
 ], [
@@ -218,7 +219,7 @@ ch('I', 'Logic gates', '🔌', [
   ], 'Think about when each gate gives a 1.')
 ]),
 
-ch('I', 'Networking', '🌐', [
+ch('I', 'Networking', 'globe', [
   { h: 'Network sizes', b: 'A LAN covers a small area such as a school. A WAN covers a large area; the Internet is the biggest WAN.', k: 'LAN · WAN' },
   { h: 'Devices', b: 'A switch connects devices inside a LAN. A router connects different networks and chooses paths for packets.' }
 ], [
@@ -233,7 +234,7 @@ ch('I', 'Networking', '🌐', [
   ], 'Size of network and job of the device are the clues.')
 ]),
 
-ch('I', 'Databases', '🗄️', [
+ch('I', 'Databases', 'database', [
   { h: 'Tables, records, fields', b: 'A database stores data in tables. Each row is a record and each column is a field.', k: 'Field → Record → Table → Database' },
   { h: 'Keys', b: 'A primary key identifies each record uniquely. A foreign key points to the primary key of another table, which links the tables.' }
 ], [
