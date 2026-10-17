@@ -3,6 +3,8 @@ name: Build APK
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'content/**'        # new questions only need a sync, not a new app build
   workflow_dispatch:
 
 permissions:
@@ -18,10 +20,13 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: android-actions/setup-android@v3
-        continue-on-error: true
+        continue-on-error: true   # the build machine already has the Android tools
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
+      - name: Tell the app its repository and build number
+        run: |
+          echo "const CONFIG = { repo: '${{ github.repository }}', build: ${{ github.run_number }} };" > app/src/main/assets/config.js
       - name: Make launcher icons from logo.png
         run: |
           pip install pillow
@@ -33,5 +38,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk al-streak.apk
+          { echo "build: ${{ github.run_number }}"; echo; cat whatsnew.md; } > notes.md
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest al-streak.apk --title "A/L Streak (latest)" --notes "Download al-streak.apk and install it."
+          gh release create latest al-streak.apk --title "A/L Streak build ${{ github.run_number }}" --notes-file notes.md
